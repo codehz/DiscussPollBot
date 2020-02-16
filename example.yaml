@@ -1,0 +1,26 @@
+﻿token: your token here
+debug-mode: true
+main-id: main group
+send-id: channel
+database: URI=file:stat.db
+delete-origin: true
+admin-direct-send: false
+admins:
+  - admin id
+
+texts:
+  approve: 接受
+  reject: 拒绝
+  reply: 请求已经收到，请管理员审核
+  approved: 投票已经创建
+  rejected: 请求已拒绝
+  stats: 投票统计
+  help: |-
+    使用方式：发送 /poll 或者 /multi_poll 创建投票和多选投票，暂时不支持 quiz 模式。
+    格式：第一行为投票标题，随后每一行都是一个选项。
+    可以通过 /stats 查询统计信息。
+  error-format: 格式错误，请检查你的格式并重新提交
+  error-disallow: 您不能在这里投稿，请去 XXXXX
+  error-reject: 请求被拒绝
+  error-changed: 原消息已经改变，需要重新审核
+  error-permission: 只有管理员能进行这项操作
