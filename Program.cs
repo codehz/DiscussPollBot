@@ -98,7 +98,7 @@ namespace PollBot {
         private static async void HandleCreate(ChatId chat_id, User user, string text, int msg) {
             try {
                 var direct_send = cfg.Admins.Contains(user.Id) && cfg.DirectSend;
-                if (chat_id != cfg.MainChatId && direct_send) {
+                if (chat_id != cfg.MainChatId && !direct_send) {
                     await botClient.SendTextMessageAsync(chat_id, cfg.translation.DisallowError);
                     return;
                 }
