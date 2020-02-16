@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Data.SQLite;
 
 namespace PollBot {
-    class DB : IDisposable {
+
+    internal class DB : IDisposable {
         private readonly SQLiteConnection connection;
+
         public DB(string conn) {
             connection = new SQLiteConnection(conn);
             connection.Open();

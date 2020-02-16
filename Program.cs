@@ -1,24 +1,22 @@
 ﻿using System;
-using System.IO;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Telegram.Bot;
+using Telegram.Bot.Args;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using Telegram.Bot.Args;
 using Telegram.Bot.Types.ReplyMarkups;
-using YamlDotNet;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-//using
 
 namespace PollBot {
-    class Program {
+
+    internal class Program {
         private static Config cfg;
         private static DB db;
         private static TelegramBotClient botClient;
 
-        static void Main(string[] _) {
+        private static void Main(string[] _) {
             var deserializer = new YamlDotNet.Serialization.DeserializerBuilder().Build();
             cfg = deserializer.Deserialize<Config>(input: System.IO.File.ReadAllText("config.yaml"));
             db = new DB(cfg.Database);
@@ -82,6 +80,7 @@ namespace PollBot {
                     botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.Rejected));
             }
         }
+
         private static async void HandleCreate(long chat_id, User user, string text, int msg) {
             var direct_send = cfg.Admins.Contains(user.Id) && cfg.DirectSend;
             if (chat_id != cfg.MainChatId && direct_send) {
