@@ -52,11 +52,13 @@ namespace PollBot {
             public string LastName;
             public int Count;
 
-            public string GetName() {
-                if (Username.Length == 0) {
-                    return $"{FirstName} {LastName}";
+            public string Name {
+                get {
+                    if (Username.Length == 0) {
+                        return $"{FirstName} {LastName}";
+                    }
+                    return $"{Username}";
                 }
-                return $"{Username}";
             }
         }
 

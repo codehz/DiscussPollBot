@@ -139,7 +139,7 @@ namespace PollBot {
         private static async void HandleStat(long chat_id, int msg_id) {
             var log = cfg.translation.Stats + "\n";
             foreach (var entry in db.StatLog()) {
-                log += $"{entry.Count} {entry.GetName()}\n";
+                log += $"{entry.Count} {entry.Name}\n";
             }
             await botClient.SendTextMessageAsync(chat_id, log, replyToMessageId: msg_id);
         }
