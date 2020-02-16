@@ -19,11 +19,11 @@ namespace PollBot {
         private static void Main(string[] _) {
             var deserializer = new YamlDotNet.Serialization.DeserializerBuilder().Build();
             cfg = deserializer.Deserialize<Config>(input: System.IO.File.ReadAllText("config.yaml"));
-            cfg.Admins = botClient.GetChatAdministratorsAsync(cfg.MainChatId).Result.Select(x => x.User.Id);
             db = new DB(cfg.Database);
             botClient = new TelegramBotClient(token: cfg.TelegramToken);
             var me = botClient.GetMeAsync().Result;
             Console.WriteLine($"UserID {me.Id} NAME: {me.FirstName}.");
+            cfg.Admins = botClient.GetChatAdministratorsAsync(cfg.MainChatId).Result.Select(x => x.User.Id);
             botClient.StartReceiving(allowedUpdates: new UpdateType[] { UpdateType.Message, UpdateType.CallbackQuery });
             botClient.OnMessage += BotClient_OnMessage;
             botClient.OnCallbackQuery += BotClient_OnCallbackQuery;
