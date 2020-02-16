@@ -1,0 +1,26 @@
+name: .NET Core
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [win-x64, linux-x64]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 3.1.100
+    - name: Build with dotnet
+      run: dotnet build -c Release
+    - name: Publish
+      run: dotnet publish -c Release -r ${{ matrix.os }} -o dist --self-contained
+    - name: Upload artifact
+      uses: actions/upload-artifact@v1.0.0
+      with:
+        name: ${{ matrix.os }}
+        path: dist
