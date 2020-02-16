@@ -149,7 +149,7 @@ namespace PollBot {
             foreach (var entry in db.StatLog()) {
                 log += $"{entry.Count} {entry.Name}\n";
             }
-            await botClient.SendTextMessageAsync(chat_id, log, replyToMessageId: msg_id);
+            await botClient.SendTextMessageAsync(chat_id, log, replyToMessageId: msg_id, disableWebPagePreview: true, parseMode: ParseMode.MarkdownV2);
         }
     }
 }

@@ -57,7 +57,7 @@ namespace PollBot {
                     if (Username.Length == 0) {
                         return $"{FirstName} {LastName}";
                     }
-                    return $"{Username}";
+                    return $"[{Username}](https://t.me/{Username})";
                 }
             }
         }
