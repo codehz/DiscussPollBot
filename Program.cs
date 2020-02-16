@@ -87,7 +87,7 @@ namespace PollBot {
                 }
             } catch (ArgumentNullException ex) {
                 Console.WriteLine(ex);
-                await botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.ExceptionError);
+                await botClient.SendTextMessageAsync(cfg.MainChatId, cfg.translation.ExceptionError);
             }
         }
 
@@ -128,7 +128,7 @@ namespace PollBot {
                 Console.WriteLine($"Unexcepted request: {firstline}");
                 return;
             }
-            var msg = await botClient.SendPollAsync(cfg.SendChatId, $"{title} by {user.FirstName}", opts, allowsMultipleAnswers: multi, isAnonymous: true);
+            var msg = await botClient.SendPollAsync(cfg.SendChatId, $"{title} by {user.FirstName} {user.LastName}", opts, allowsMultipleAnswers: multi, isAnonymous: true);
             db.AddLog(user.Id, user.Username, user.FirstName, user.LastName, title, msg.MessageId);
         }
 
