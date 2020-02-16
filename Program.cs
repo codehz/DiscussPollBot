@@ -15,6 +15,7 @@ namespace PollBot {
         private static Config cfg;
         private static DB db;
         private static TelegramBotClient botClient;
+        private static string botname;
 
         private static void Main(string[] _) {
             var deserializer = new YamlDotNet.Serialization.DeserializerBuilder().Build();
@@ -22,7 +23,8 @@ namespace PollBot {
             db = new DB(cfg.Database);
             botClient = new TelegramBotClient(token: cfg.TelegramToken);
             var me = botClient.GetMeAsync().Result;
-            Console.WriteLine($"UserID {me.Id} NAME: {me.FirstName}.");
+            botname = me.Username;
+            Console.WriteLine($"UserID {me.Id} NAME: {me.Username}.");
             cfg.Admins = botClient.GetChatAdministratorsAsync(cfg.MainChatId).Result.Select(x => x.User.Id);
             botClient.StartReceiving(allowedUpdates: new UpdateType[] { UpdateType.Message, UpdateType.CallbackQuery });
             botClient.OnMessage += BotClient_OnMessage;
@@ -40,11 +42,11 @@ namespace PollBot {
                 var user = e.Message.From;
                 if (text.StartsWith("/poll") || text.StartsWith("/multi_poll")) {
                     HandleCreate(chat_id: e.Message.Chat.Id, user: user, text: e.Message.Text, msg: e.Message.MessageId);
-                } else if (text == "/help") {
+                } else if (text == "/help" || text == $"/help@{botname}") {
                     await botClient.SendTextMessageAsync(e.Message.Chat.Id, cfg.translation.Help, replyToMessageId: e.Message.MessageId);
-                } else if (text == "/stats") {
+                } else if (text == "/stats" || text == $"/stats@{botname}") {
                     HandleStat(chat_id: e.Message.Chat.Id, e.Message.MessageId);
-                } else if (text == "/refresh_admin") {
+                } else if (text == "/refresh_admin" || text == $"/refresh_admin@{botname}") {
                     cfg.Admins = (await botClient.GetChatAdministratorsAsync(cfg.MainChatId)).Select(x => x.User.Id);
                 }
             }
@@ -53,38 +55,43 @@ namespace PollBot {
         private static async void BotClient_OnCallbackQuery(object sender, CallbackQueryEventArgs e) {
             const string _approve = "approve ";
             var query = e.CallbackQuery;
-            if (!cfg.Admins.Contains(query.From.Id)) {
-                await botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.PermissionError);
-                return;
-            }
-            if (query.Data.StartsWith(_approve)) {
-                var hash = int.Parse(query.Data.Remove(0, _approve.Length));
-                var origin = query.Message.ReplyToMessage;
-                var text = origin.Text;
-                var shash = text.GetHashCode();
-                if (hash != shash) {
-                    await Task.WhenAll(
-                        botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.HashMisMatchError),
-                        botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId),
-                        SendRequest(origin.MessageId, cfg.translation.HashMisMatchError, shash));
+            try {
+                if (!cfg.Admins.Contains(query.From.Id)) {
+                    await botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.PermissionError);
                     return;
                 }
-                VerifyMessage(text, out var firstline, out var opts);
-                await SendPoll(origin.From, firstline, opts);
-                if (cfg.DeleteOrigin)
-                    await botClient.DeleteMessageAsync(cfg.MainChatId, origin.MessageId);
-                await Task.WhenAll(
-                    botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId),
-                    botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.Approved));
-            } else {
-                await Task.WhenAll(
-                    botClient.SendTextMessageAsync(cfg.MainChatId, cfg.translation.RejectError),
-                    botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId),
-                    botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.Rejected));
+                if (query.Data.StartsWith(_approve)) {
+                    var hash = int.Parse(query.Data.Remove(0, _approve.Length));
+                    var origin = query.Message.ReplyToMessage;
+                    var text = origin.Text;
+                    var shash = text.GetHashCode();
+                    if (hash != shash) {
+                        await Task.WhenAll(
+                            botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.HashMisMatchError),
+                            botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId),
+                            SendRequest(origin.MessageId, cfg.translation.HashMisMatchError, shash));
+                        return;
+                    }
+                    VerifyMessage(text, out var firstline, out var opts);
+                    await SendPoll(origin.From, firstline, opts);
+                    if (cfg.DeleteOrigin)
+                        await botClient.DeleteMessageAsync(cfg.MainChatId, origin.MessageId);
+                    await Task.WhenAll(
+                        botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId),
+                        botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.Approved));
+                } else {
+                    await Task.WhenAll(
+                        botClient.SendTextMessageAsync(cfg.MainChatId, cfg.translation.RejectError, replyToMessageId: query.Message.ReplyToMessage.MessageId),
+                        botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId),
+                        botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.Rejected));
+                }
+            } catch (ArgumentNullException ex) {
+                Console.WriteLine(ex);
+                await botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.ExceptionError);
             }
         }
 
-        private static async void HandleCreate(long chat_id, User user, string text, int msg) {
+        private static async void HandleCreate(ChatId chat_id, User user, string text, int msg) {
             var direct_send = cfg.Admins.Contains(user.Id) && cfg.DirectSend;
             if (chat_id != cfg.MainChatId && direct_send) {
                 await botClient.SendTextMessageAsync(chat_id, cfg.translation.DisallowError);
@@ -109,15 +116,13 @@ namespace PollBot {
                             InlineKeyboardButton.WithCallbackData(cfg.translation.Approve, $"approve {hash}"),
                             InlineKeyboardButton.WithCallbackData(cfg.translation.Reject, "reject") }));
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0018:Inline variable declaration", Justification = "<Pending>")]
         private static async Task SendPoll(User user, string firstline, IEnumerable<string> opts) {
-            const string _poll = "/poll ";
-            const string _mpoll = "/multi_poll ";
-            var multi = false;
             string title;
-            if (firstline.StartsWith(_poll)) {
-                title = firstline.Remove(0, _poll.Length);
-            } else if (firstline.StartsWith(_mpoll)) {
-                title = firstline.Remove(0, _mpoll.Length);
+            bool multi;
+            if (firstline.TryRemovePrefix("/poll ", out title) || firstline.TryRemovePrefix($"/poll@{botname} ", out title)) {
+                multi = false;
+            } else if (firstline.TryRemovePrefix((string) "/multi_poll ", out title) || firstline.TryRemovePrefix((string) $"/multi_poll@{botname} ", out title)) {
                 multi = true;
             } else {
                 Console.WriteLine($"Unexcepted request: {firstline}");

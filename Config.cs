@@ -13,10 +13,10 @@ namespace PollBot {
         public bool DebugMode { get; set; } = false;
 
         [Required, YamlMember(Alias = "main-id")]
-        public long MainChatId { get; set; } = 0;
+        public string MainChatId { get; set; }
 
         [Required, YamlMember(Alias = "send-id")]
-        public long SendChatId { get; set; } = 0;
+        public string SendChatId { get; set; }
 
         [Required, YamlMember(Alias = "database")]
         public string Database { get; set; } = "";
