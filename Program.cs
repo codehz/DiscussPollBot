@@ -65,14 +65,18 @@ namespace PollBot {
                     var origin = query.Message.ReplyToMessage;
                     var text = origin.Text;
                     var shash = text.GetHashCode();
+                    if (!VerifyMessage(text, out var firstline, out var opts)) {
+                        await botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId);
+                        await botClient.SendTextMessageAsync(origin.Chat.Id, cfg.translation.FormatError);
+                        return;
+                    }
                     if (hash != shash) {
                         await Task.WhenAll(
                             botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.HashMisMatchError),
                             botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId),
-                            SendRequest(origin.MessageId, cfg.translation.HashMisMatchError, shash));
+                            SendRequest(origin.From, firstline, opts, origin.MessageId, shash));
                         return;
                     }
-                    VerifyMessage(text, out var firstline, out var opts);
                     await SendPoll(origin.From, firstline, opts);
                     if (cfg.DeleteOrigin)
                         await botClient.DeleteMessageAsync(cfg.MainChatId, origin.MessageId);
@@ -85,36 +89,56 @@ namespace PollBot {
                         botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId),
                         botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.Rejected));
                 }
-            } catch (ArgumentNullException ex) {
+            } catch (Exception ex) {
                 Console.WriteLine(ex);
                 await botClient.SendTextMessageAsync(cfg.MainChatId, cfg.translation.ExceptionError);
             }
         }
 
         private static async void HandleCreate(ChatId chat_id, User user, string text, int msg) {
-            var direct_send = cfg.Admins.Contains(user.Id) && cfg.DirectSend;
-            if (chat_id != cfg.MainChatId && direct_send) {
-                await botClient.SendTextMessageAsync(chat_id, cfg.translation.DisallowError);
+            try {
+                var direct_send = cfg.Admins.Contains(user.Id) && cfg.DirectSend;
+                if (chat_id != cfg.MainChatId && direct_send) {
+                    await botClient.SendTextMessageAsync(chat_id, cfg.translation.DisallowError);
+                    return;
+                }
+                if (!VerifyMessage(text, out var firstline, out var opts)) {
+                    await botClient.SendTextMessageAsync(chat_id, cfg.translation.FormatError);
+                    return;
+                }
+                if (direct_send) {
+                    await SendPoll(user, firstline, opts);
+                } else {
+                    await SendRequest(user, firstline, opts, msg, text.GetHashCode());
+                }
+            } catch(Exception ex) {
+                Console.WriteLine(ex.StackTrace);
+                await botClient.SendTextMessageAsync(chat_id, cfg.translation.ExceptionError);
                 return;
-            }
-            if (!VerifyMessage(text, out var firstline, out var opts)) {
-                await botClient.SendTextMessageAsync(chat_id, cfg.translation.FormatError);
-                return;
-            }
-            if (direct_send) {
-                await SendPoll(user, firstline, opts);
-            } else {
-                await SendRequest(msg, cfg.translation.Reply, text.GetHashCode());
             }
         }
 
-        private static async Task SendRequest(int msg, string content, int hash) => await botClient.SendTextMessageAsync(cfg.MainChatId, content,
-                disableWebPagePreview: true,
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0018:Inline variable declaration", Justification = "<Pending>")]
+        private static async Task SendRequest(User user, string firstline, IEnumerable<string> opts, int msg, int hash) {
+            string title;
+            bool multi;
+            if (firstline.TryRemovePrefix("/poll ", out title) || firstline.TryRemovePrefix($"/poll@{botname} ", out title)) {
+                multi = false;
+            } else if (firstline.TryRemovePrefix("/multi_poll ", out title) || firstline.TryRemovePrefix($"/multi_poll@{botname} ", out title)) {
+                multi = true;
+            } else {
+                Console.WriteLine($"Unexcepted request: {firstline}");
+                return;
+            }
+            await botClient.SendPollAsync(cfg.MainChatId, $"{title} by {user.FirstName} {user.LastName}", opts,
+                allowsMultipleAnswers: multi,
+                isAnonymous: true,
                 replyToMessageId: msg,
-                replyMarkup: new InlineKeyboardMarkup(
-                    new InlineKeyboardButton[] {
-                            InlineKeyboardButton.WithCallbackData(cfg.translation.Approve, $"approve {hash}"),
-                            InlineKeyboardButton.WithCallbackData(cfg.translation.Reject, "reject") }));
+                isClosed: true,
+                replyMarkup: new InlineKeyboardMarkup(new InlineKeyboardButton[] {
+                    InlineKeyboardButton.WithCallbackData(cfg.translation.Approve, $"approve {hash}"),
+                    InlineKeyboardButton.WithCallbackData(cfg.translation.Reject, "reject") }));
+        }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0018:Inline variable declaration", Justification = "<Pending>")]
         private static async Task SendPoll(User user, string firstline, IEnumerable<string> opts) {
