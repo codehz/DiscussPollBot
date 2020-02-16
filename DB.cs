@@ -57,7 +57,7 @@ namespace PollBot {
                     if (Username.Length == 0) {
                         return $"{FirstName} {LastName}";
                     }
-                    return $"[{Username}](https://t.me/{Username})";
+                    return $"<a href=\"https://t.me/{Username}\">{Username}</a>";
                 }
             }
         }
