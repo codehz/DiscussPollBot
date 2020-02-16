@@ -40,7 +40,7 @@ namespace PollBot {
                     Console.WriteLine(ObjectDumper.Dump(e.Message));
                 var text = e.Message.Text;
                 var user = e.Message.From;
-                if (text.StartsWith("/poll") || text.StartsWith("/multi_poll")) {
+                if (text.StartsWith("/poll") || text.StartsWith("/mpoll")) {
                     HandleCreate(chat_id: e.Message.Chat.Id, user: user, text: e.Message.Text, msg: e.Message.MessageId);
                 } else if (text == "/help" || text == $"/help@{botname}") {
                     await botClient.SendTextMessageAsync(e.Message.Chat.Id, cfg.translation.Help, replyToMessageId: e.Message.MessageId);
@@ -124,7 +124,7 @@ namespace PollBot {
             bool multi;
             if (firstline.TryRemovePrefix("/poll ", out title) || firstline.TryRemovePrefix($"/poll@{botname} ", out title)) {
                 multi = false;
-            } else if (firstline.TryRemovePrefix("/multi_poll ", out title) || firstline.TryRemovePrefix($"/multi_poll@{botname} ", out title)) {
+            } else if (firstline.TryRemovePrefix("/mpoll ", out title) || firstline.TryRemovePrefix($"/mpoll@{botname} ", out title)) {
                 multi = true;
             } else {
                 Console.WriteLine($"Unexcepted request: {firstline}");
@@ -146,7 +146,7 @@ namespace PollBot {
             bool multi;
             if (firstline.TryRemovePrefix("/poll ", out title) || firstline.TryRemovePrefix($"/poll@{botname} ", out title)) {
                 multi = false;
-            } else if (firstline.TryRemovePrefix((string) "/multi_poll ", out title) || firstline.TryRemovePrefix((string) $"/multi_poll@{botname} ", out title)) {
+            } else if (firstline.TryRemovePrefix("/mpoll ", out title) || firstline.TryRemovePrefix($"/mpoll@{botname} ", out title)) {
                 multi = true;
             } else {
                 Console.WriteLine($"Unexcepted request: {firstline}");
