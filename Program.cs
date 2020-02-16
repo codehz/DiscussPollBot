@@ -19,6 +19,7 @@ namespace PollBot {
         private static void Main(string[] _) {
             var deserializer = new YamlDotNet.Serialization.DeserializerBuilder().Build();
             cfg = deserializer.Deserialize<Config>(input: System.IO.File.ReadAllText("config.yaml"));
+            cfg.Admins = botClient.GetChatAdministratorsAsync(cfg.MainChatId).Result.Select(x => x.User.Id);
             db = new DB(cfg.Database);
             botClient = new TelegramBotClient(token: cfg.TelegramToken);
             var me = botClient.GetMeAsync().Result;
@@ -43,6 +44,8 @@ namespace PollBot {
                     await botClient.SendTextMessageAsync(e.Message.Chat.Id, cfg.translation.Help, replyToMessageId: e.Message.MessageId);
                 } else if (text == "/stats") {
                     HandleStat(chat_id: e.Message.Chat.Id, e.Message.MessageId);
+                } else if (text == "/refresh_admin") {
+                    cfg.Admins = (await botClient.GetChatAdministratorsAsync(cfg.MainChatId)).Select(x => x.User.Id);
                 }
             }
         }

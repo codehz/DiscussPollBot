@@ -27,8 +27,8 @@ namespace PollBot {
         [Required, YamlMember(Alias = "admin-direct-send")]
         public bool DirectSend { get; set; } = true;
 
-        [Required, YamlMember(Alias = "admins")]
-        public IEnumerable<long> Admins { get; set; }
+        [YamlIgnore]
+        public IEnumerable<int> Admins { get; set; }
 
         [Required, YamlMember(Alias = "texts")]
         public Translation translation;

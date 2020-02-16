@@ -5,8 +5,6 @@ send-id: channel
 database: URI=file:stat.db
 delete-origin: true
 admin-direct-send: false
-admins:
-  - admin id
 
 texts:
   approve: 接受
