@@ -65,7 +65,7 @@ namespace PollBot {
         public IEnumerable<Entry> StatLog() {
             using var query = new SQLiteCommand {
                 Connection = connection,
-                CommandText = "SELECT namemap.*, count(stat.user) as count FROM stat JOIN namemap WHERE stat.time > datetime('now', '-7 days') GROUP BY stat.user ORDER BY count(stat.user) DESC LIMIT 10;"
+                CommandText = "SELECT namemap.*, count(stat.user) as count FROM stat JOIN namemap USING(user) WHERE stat.time > datetime('now', '-7 days') GROUP BY stat.user ORDER BY count(stat.user) DESC LIMIT 10;"
             };
             using var reader = query.ExecuteReader();
             while (reader.Read()) {
