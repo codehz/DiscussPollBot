@@ -211,7 +211,7 @@ namespace PollBot {
         private static async Task DuplicatePoll(Message origin) {
             var poll = origin.Poll;
             var user = origin.From;
-            var msg = await botClient.SendPollAsync(cfg.MainChatId, $"test {poll.Question} by {user.FirstName} {user.LastName}",
+            var msg = await botClient.SendPollAsync(cfg.MainChatId, $"{poll.Question} by {user.FirstName} {user.LastName}",
                 options: poll.Options.Select(op => op.Text),
                 allowsMultipleAnswers: poll.AllowsMultipleAnswers,
                 isAnonymous: true);
