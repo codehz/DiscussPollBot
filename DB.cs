@@ -71,9 +71,9 @@ namespace PollBot {
             while (reader.Read()) {
                 yield return new Entry {
                     UserId = reader.GetInt64(0),
-                    Username = reader.GetString(1),
-                    FirstName = reader.GetString(2),
-                    LastName = reader.GetString(3),
+                    Username = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                    FirstName = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                    LastName = reader.IsDBNull(3) ? "" : reader.GetString(3),
                     Count = reader.GetInt32(4)
                 };
             }
