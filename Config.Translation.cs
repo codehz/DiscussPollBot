@@ -13,6 +13,9 @@ namespace PollBot {
             [Required, YamlMember(Alias = "reject")]
             public string Reject { get; set; } = "reject";
 
+            [Required, YamlMember(Alias = "duplicate")]
+            public string Duplicate { get; set; } = "duplicate";
+
             [Required, YamlMember(Alias = "approved")]
             public string Approved { get; set; } = "approved";
 
@@ -42,6 +45,18 @@ namespace PollBot {
 
             [Required, YamlMember(Alias = "error-exception")]
             public string ExceptionError { get; set; } = "error-exception";
+
+            [Required, YamlMember(Alias = "error-noreply")]
+            public string NoReplyError { get; set; } = "error-noreply";
+
+            [Required, YamlMember(Alias = "error-notpoll")]
+            public string NotPollError { get; set; } = "error-notpoll";
+
+            [Required, YamlMember(Alias = "error-notclosed")]
+            public string NotClosedError { get; set; } = "error-notclosed";
+
+            [Required, YamlMember(Alias = "error-notquiz")]
+            public string NotQuizError { get; set; } = "error-notquiz";
         }
     }
 }

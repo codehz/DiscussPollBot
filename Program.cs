@@ -48,12 +48,50 @@ namespace PollBot {
                     HandleStat(chat_id: e.Message.Chat.Id, e.Message.MessageId);
                 } else if (text == "/refresh_admin" || text == $"/refresh_admin@{botname}") {
                     cfg.Admins = (await botClient.GetChatAdministratorsAsync(cfg.MainChatId)).Select(x => x.User.Id);
+                } else if (text == "/dup" || text == $"/dup@{botname}") {
+                    HandleDuplicate(msg: e.Message);
                 }
             }
         }
 
+        private static async void HandleDuplicate(Message msg) {
+            if ((ChatId) msg.Chat.Id != cfg.MainChatId) {
+                await botClient.SendTextMessageAsync(msg.Chat.Id, cfg.translation.DisallowError);
+                return;
+            }
+            if (cfg.DeleteOrigin)
+                await botClient.DeleteMessageAsync(cfg.MainChatId, msg.MessageId);
+            var rep = msg.ReplyToMessage;
+            if (rep == null) {
+                await botClient.SendTextMessageAsync(cfg.MainChatId, cfg.translation.NoReplyError);
+                return;
+            }
+            if (rep.Poll == null) {
+                await botClient.SendTextMessageAsync(cfg.MainChatId, cfg.translation.NotPollError);
+                return;
+            }
+            if (!rep.Poll.IsClosed) {
+                await botClient.SendTextMessageAsync(cfg.MainChatId, cfg.translation.NotClosedError);
+                return;
+            }
+            if (rep.Poll.Type == "quiz") {
+                await botClient.SendTextMessageAsync(cfg.MainChatId, cfg.translation.NotQuizError);
+                return;
+            }
+            await botClient.SendTextMessageAsync(cfg.MainChatId, cfg.translation.Duplicate,
+                parseMode: ParseMode.Html,
+                disableWebPagePreview: true,
+                disableNotification: true,
+                replyToMessageId: rep.MessageId,
+                replyMarkup: new InlineKeyboardMarkup(new InlineKeyboardButton[] {
+                    InlineKeyboardButton.WithCallbackData(cfg.translation.Approve, "duplicate"),
+                    InlineKeyboardButton.WithCallbackData(cfg.translation.Reject, "reject") }));
+        }
+
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "<Pending>")]
         private static async void BotClient_OnCallbackQuery(object sender, CallbackQueryEventArgs e) {
             const string _approve = "approve ";
+            const string _duplicate = "duplicate";
             var query = e.CallbackQuery;
             try {
                 if (!cfg.Admins.Contains(query.From.Id)) {
@@ -78,11 +116,19 @@ namespace PollBot {
                         return;
                     }
                     await SendPoll(origin.From, firstline, opts);
-                    if (cfg.DeleteOrigin)
-                        await botClient.DeleteMessageAsync(cfg.MainChatId, origin.MessageId);
                     await Task.WhenAll(
                         botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId),
                         botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.Approved));
+                    if (cfg.DeleteOrigin)
+                        await botClient.DeleteMessageAsync(cfg.MainChatId, origin.MessageId);
+                } else if (query.Data == _duplicate) {
+                    var origin = query.Message.ReplyToMessage;
+                    await DuplicatePoll(origin);
+                    await Task.WhenAll(
+                        botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId),
+                        botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.Approved));
+                    if (cfg.DeleteOrigin)
+                        await botClient.DeleteMessageAsync(cfg.MainChatId, origin.MessageId);
                 } else {
                     await Task.WhenAll(
                         botClient.SendTextMessageAsync(cfg.MainChatId, cfg.translation.RejectError, replyToMessageId: query.Message.ReplyToMessage.MessageId),
@@ -91,7 +137,13 @@ namespace PollBot {
                 }
             } catch (Exception ex) {
                 Console.WriteLine(ex);
-                await botClient.SendTextMessageAsync(cfg.MainChatId, cfg.translation.ExceptionError);
+                try {
+                    await botClient.DeleteMessageAsync(query.Message.Chat.Id, query.Message.MessageId);
+                } catch { }
+                try {
+                    await botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.ExceptionError);
+                    await botClient.SendTextMessageAsync(cfg.MainChatId, cfg.translation.ExceptionError);
+                } catch { }
             }
         }
 
@@ -111,7 +163,7 @@ namespace PollBot {
                 } else {
                     await SendRequest(user, firstline, opts, msg, text.GetHashCode());
                 }
-            } catch(Exception ex) {
+            } catch (Exception ex) {
                 Console.WriteLine(ex.StackTrace);
                 await botClient.SendTextMessageAsync(chat_id, cfg.translation.ExceptionError);
                 return;
@@ -154,6 +206,16 @@ namespace PollBot {
             }
             var msg = await botClient.SendPollAsync(cfg.SendChatId, $"{title} by {user.FirstName} {user.LastName}", opts, allowsMultipleAnswers: multi, isAnonymous: true);
             db.AddLog(user.Id, user.Username, user.FirstName, user.LastName, title, msg.MessageId);
+        }
+
+        private static async Task DuplicatePoll(Message origin) {
+            var poll = origin.Poll;
+            var user = origin.From;
+            var msg = await botClient.SendPollAsync(cfg.MainChatId, $"test {poll.Question} by {user.FirstName} {user.LastName}",
+                options: poll.Options.Select(op => op.Text),
+                allowsMultipleAnswers: poll.AllowsMultipleAnswers,
+                isAnonymous: true);
+            db.AddLog(user.Id, user.Username, user.FirstName, user.LastName, poll.Question, msg.MessageId);
         }
 
         private static bool VerifyMessage(string data, out string firstline, out IEnumerable<string> opts) {
