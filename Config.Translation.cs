@@ -43,6 +43,9 @@ namespace PollBot {
             [Required, YamlMember(Alias = "error-permission")]
             public string PermissionError { get; set; } = "error-permission";
 
+            [Required, YamlMember(Alias = "error-permissionwithauthor")]
+            public string PermissionWithAuthorError { get; set; } = "error-permissionwithauthor";
+
             [Required, YamlMember(Alias = "error-exception")]
             public string ExceptionError { get; set; } = "error-exception";
 
