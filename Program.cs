@@ -111,7 +111,7 @@ namespace PollBot {
                     var origin = query.Message.ReplyToMessage;
                     var text = origin.Text;
                     var shash = text.GetHashCode();
-                    var error = VerifyMessage(text, out var firstline, out var opts);
+                    var error = VerifyMessage(text, origin.From, out var firstline, out var opts, out var multi);
                     if (error != null) {
                         await botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId);
                         await botClient.SendTextMessageAsync(origin.Chat.Id, error);
@@ -121,7 +121,7 @@ namespace PollBot {
                         await Task.WhenAll(
                             botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.HashMisMatchError),
                             botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId),
-                            SendRequest(origin.From, firstline, opts, origin.MessageId, shash));
+                            SendRequest(firstline, opts, origin.MessageId, shash, multi));
                         return;
                     }
                     await SendPoll(origin.From, firstline, opts);
@@ -163,7 +163,7 @@ namespace PollBot {
                     await botClient.SendTextMessageAsync(chat_id, cfg.translation.DisallowError);
                     return;
                 }
-                string error = VerifyMessage(text, out var firstline, out var opts);
+                string error = VerifyMessage(text, user, out var firstline, out var opts, out var multi);
                 if (error != null) {
                     await botClient.SendTextMessageAsync(chat_id, error);
                     return;
@@ -171,7 +171,7 @@ namespace PollBot {
                 if (direct_send) {
                     await SendPoll(user, firstline, opts);
                 } else {
-                    await SendRequest(user, firstline, opts, msg, text.GetHashCode());
+                    await SendRequest(firstline, opts, msg, text.GetHashCode(), multi);
                 }
             } catch (Exception ex) {
                 Console.WriteLine(ex.StackTrace);
@@ -181,18 +181,8 @@ namespace PollBot {
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0018:Inline variable declaration", Justification = "<Pending>")]
-        private static async Task SendRequest(User user, string firstline, IEnumerable<string> opts, int msg, int hash) {
-            string title;
-            bool multi;
-            if (firstline.TryRemovePrefix("/poll ", out title) || firstline.TryRemovePrefix($"/poll@{botname} ", out title)) {
-                multi = false;
-            } else if (firstline.TryRemovePrefix("/mpoll ", out title) || firstline.TryRemovePrefix($"/mpoll@{botname} ", out title)) {
-                multi = true;
-            } else {
-                Console.WriteLine($"Unexcepted request: {firstline}");
-                return;
-            }
-            await botClient.SendPollAsync(cfg.MainChatId, $"{title} by {user.FirstName} {user.LastName}", opts,
+        private static async Task SendRequest(string question, IEnumerable<string> opts, int msg, int hash, bool multi) {
+            await botClient.SendPollAsync(cfg.MainChatId, question, opts,
                 allowsMultipleAnswers: multi,
                 isAnonymous: true,
                 replyToMessageId: msg,
@@ -203,19 +193,9 @@ namespace PollBot {
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0018:Inline variable declaration", Justification = "<Pending>")]
-        private static async Task SendPoll(User user, string firstline, IEnumerable<string> opts) {
-            string title;
-            bool multi;
-            if (firstline.TryRemovePrefix("/poll ", out title) || firstline.TryRemovePrefix($"/poll@{botname} ", out title)) {
-                multi = false;
-            } else if (firstline.TryRemovePrefix("/mpoll ", out title) || firstline.TryRemovePrefix($"/mpoll@{botname} ", out title)) {
-                multi = true;
-            } else {
-                Console.WriteLine($"Unexcepted request: {firstline}");
-                return;
-            }
-            var msg = await botClient.SendPollAsync(cfg.SendChatId, $"{title} by {user.FirstName} {user.LastName}", opts, allowsMultipleAnswers: multi, isAnonymous: true);
-            db.AddLog(user.Id, user.Username, user.FirstName, user.LastName, title, msg.MessageId);
+        private static async Task SendPoll(User user, string question, IEnumerable<string> opts, bool multi) {
+            var msg = await botClient.SendPollAsync(cfg.SendChatId, question, opts, allowsMultipleAnswers: multi, isAnonymous: true);
+            db.AddLog(user.Id, user.Username, user.FirstName, user.LastName, question, msg.MessageId);
         }
 
         private static async Task DuplicatePoll(Message origin) {
@@ -228,12 +208,31 @@ namespace PollBot {
             db.AddLog(user.Id, user.Username, user.FirstName, user.LastName, poll.Question, msg.MessageId);
         }
 
-        private static string VerifyMessage(string data, out string firstline, out IEnumerable<string> opts) {
+        private static string VerifyMessage(string data, User user, out string firstline, out IEnumerable<string> opts, out Boolean multi) {
+            // Default values;
+            firstline = null;
+            opts = null;
+            multi = false;
+
+            // Poll types
+            if (firstline.TryRemovePrefix("/poll ", out data) || firstline.TryRemovePrefix($"/poll@{botname} ", out data)) {
+                multi = false;
+            } else if (firstline.TryRemovePrefix("/mpoll ", out data) || firstline.TryRemovePrefix($"/mpoll@{botname} ", out data)) {
+                multi = true;
+            } else {
+                Console.WriteLine($"Unexcepted request: {firstline}");
+                return cfg.translation.FormatError;
+            }
+
+            // data preparation
             var lines = data.Split("\n").ToList();
             string question = null;
             IEnumerable<string> options = null;
-            firstline = null;
-            opts = null;
+            string authorSuffix = $" by {user.FirstName}";
+            if (user.LastName != null && user.LastName != "") {
+                authorSuffix += " " + user.LastName;
+            }
+            int authorSuffixLength = authorSuffix.UTF16Length();
             int i = 0;
             while (i < lines.Count) {
                 if (DIVIDER_REGEX.Match(lines[i]).Success) {
@@ -247,12 +246,13 @@ namespace PollBot {
                 question = lines[0].Trim();
                 options = lines.TakeLast(lines.Count - 1).Select(x => x.Trim());
             }
-            if (question.UTF16Length() > MAX_QUESTION_LENGTH) {
+            if (question.UTF16Length() > MAX_QUESTION_LENGTH - authorSuffixLength) {
                 return String.Format(
                         cfg.translation.QuestionTooLongError,
-                        MAX_QUESTION_LENGTH, question.UTF16Length()
+                        MAX_QUESTION_LENGTH - authorSuffixLength, question.UTF16Length()
                     );
             }
+            question += authorSuffix;
             if (options.Count() < MIN_OPTIONS || options.Count() > MAX_OPTIONS) {
                 return String.Format(
                         cfg.translation.WrongOptionSizeError,
