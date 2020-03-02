@@ -57,6 +57,15 @@ namespace PollBot {
 
             [Required, YamlMember(Alias = "error-notquiz")]
             public string NotQuizError { get; set; } = "error-notquiz";
+
+            [Required, YamlMember(Alias = "error-questiontoolong")]
+            public string QuestionTooLongError { get; set; } = "error-questiontoolong";
+
+            [Required, YamlMember(Alias = "error-optiontoolong")]
+            public string OptionTooLongError { get; set; } = "error-optiontoolong";
+
+            [Required, YamlMember(Alias = "error-wrongoptionsize")]
+            public string WrongOptionSizeError { get; set; } = "error-wrongoptionsize";
         }
     }
 }

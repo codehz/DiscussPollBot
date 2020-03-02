@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Bot;
@@ -16,6 +17,13 @@ namespace PollBot {
         private static DB db;
         private static TelegramBotClient botClient;
         private static string botname;
+
+        private static readonly Regex DIVIDER_REGEX = new Regex(@"^-{3,}$", RegexOptions.Compiled);
+
+        private const int MAX_QUESTION_LENGTH = 255;
+        private const int MAX_OPTION_LENGTH = 100;
+        private const int MAX_OPTIONS = 10;
+        private const int MIN_OPTIONS = 2;
 
         private static void Main(string[] _) {
             var deserializer = new YamlDotNet.Serialization.DeserializerBuilder().Build();
@@ -103,9 +111,10 @@ namespace PollBot {
                     var origin = query.Message.ReplyToMessage;
                     var text = origin.Text;
                     var shash = text.GetHashCode();
-                    if (!VerifyMessage(text, out var firstline, out var opts)) {
+                    var error = VerifyMessage(text, out var firstline, out var opts);
+                    if (error != null) {
                         await botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId);
-                        await botClient.SendTextMessageAsync(origin.Chat.Id, cfg.translation.FormatError);
+                        await botClient.SendTextMessageAsync(origin.Chat.Id, error);
                         return;
                     }
                     if (hash != shash) {
@@ -154,8 +163,9 @@ namespace PollBot {
                     await botClient.SendTextMessageAsync(chat_id, cfg.translation.DisallowError);
                     return;
                 }
-                if (!VerifyMessage(text, out var firstline, out var opts)) {
-                    await botClient.SendTextMessageAsync(chat_id, cfg.translation.FormatError);
+                string error = VerifyMessage(text, out var firstline, out var opts);
+                if (error != null) {
+                    await botClient.SendTextMessageAsync(chat_id, error);
                     return;
                 }
                 if (direct_send) {
@@ -218,16 +228,48 @@ namespace PollBot {
             db.AddLog(user.Id, user.Username, user.FirstName, user.LastName, poll.Question, msg.MessageId);
         }
 
-        private static bool VerifyMessage(string data, out string firstline, out IEnumerable<string> opts) {
-            var sp = data.Split("\n");
-            firstline = sp[0].Trim();
-            if (sp.Length > 2 && firstline.Split(' ', 2).Length == 2) {
-                opts = sp.Skip(1).Select(x => x.Trim());
-                return true;
-            }
+        private static string VerifyMessage(string data, out string firstline, out IEnumerable<string> opts) {
+            var lines = data.Split("\n").ToList();
+            string question = null;
+            IEnumerable<string> options = null;
             firstline = null;
             opts = null;
-            return false;
+            int i = 0;
+            while (i < lines.Count) {
+                if (DIVIDER_REGEX.Match(lines[i]).Success) {
+                    question = string.Join("\n", lines.Take(i)).Trim();
+                    options = lines.TakeLast(lines.Count - i - 1).Select(x => x.Trim());
+                    break;
+                }
+                i++;
+            }
+            if (question == null) {
+                question = lines[0].Trim();
+                options = lines.TakeLast(lines.Count - 1).Select(x => x.Trim());
+            }
+            if (question.UTF16Length() > MAX_QUESTION_LENGTH) {
+                return String.Format(
+                        cfg.translation.QuestionTooLongError,
+                        MAX_QUESTION_LENGTH, question.UTF16Length()
+                    );
+            }
+            if (options.Count() < MIN_OPTIONS || options.Count() > MAX_OPTIONS) {
+                return String.Format(
+                        cfg.translation.WrongOptionSizeError,
+                        MIN_OPTIONS, MAX_OPTIONS, options.Count()
+                    );
+            }
+            foreach (string option in options) {
+                if (option.UTF16Length() > MAX_OPTION_LENGTH) {
+                    return String.Format(
+                            cfg.translation.OptionTooLongError,
+                            MAX_OPTION_LENGTH, option.UTF16Length(), option
+                        );
+                }
+            }
+            firstline = question;
+            opts = options;
+            return null;
         }
 
         private static async void HandleStat(long chat_id, int msg_id) {
