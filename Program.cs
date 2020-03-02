@@ -240,9 +240,9 @@ namespace PollBot {
             multi = false;
 
             // Poll types
-            if (firstline.TryRemovePrefix("/poll ", out data) || firstline.TryRemovePrefix($"/poll@{botname} ", out data)) {
+            if (data.TryRemovePrefix("/poll ", out data) || data.TryRemovePrefix($"/poll@{botname} ", out data)) {
                 multi = false;
-            } else if (firstline.TryRemovePrefix("/mpoll ", out data) || firstline.TryRemovePrefix($"/mpoll@{botname} ", out data)) {
+            } else if (data.TryRemovePrefix("/mpoll ", out data) || data.TryRemovePrefix($"/mpoll@{botname} ", out data)) {
                 multi = true;
             } else {
                 Console.WriteLine($"Unexcepted request: {firstline}");
