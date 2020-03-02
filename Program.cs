@@ -245,7 +245,7 @@ namespace PollBot {
                 multi = true;
             } else {
                 Console.WriteLine($"Unexcepted request: {firstline}");
-                return cfg.translation.FormatError;
+                return cfg.translation.Help;
             }
 
             // data preparation
