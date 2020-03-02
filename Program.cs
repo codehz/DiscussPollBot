@@ -102,35 +102,52 @@ namespace PollBot {
             const string _duplicate = "duplicate";
             var query = e.CallbackQuery;
             try {
-                if (!cfg.Admins.Contains(query.From.Id)) {
-                    await botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.PermissionError);
-                    return;
-                }
-                if (query.Data.StartsWith(_approve)) {
+                if (query.Data.StartsWith(_approve)) { // Update / approve
                     var hash = int.Parse(query.Data.Remove(0, _approve.Length));
                     var origin = query.Message.ReplyToMessage;
                     var text = origin.Text;
                     var shash = text.GetHashCode();
+
+                    // Check permission
+                    if (hash != shash) { // edited, update
+                        // check admin / author permission
+                        if (!cfg.Admins.Contains(query.From.Id) && query.From.Id != query.Message.From.Id) {
+                            await botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.PermissionWithAuthorError);
+                            return;
+                        }
+                    } else { // not edited, approve
+                        // check admin permission
+                        if (!cfg.Admins.Contains(query.From.Id)) {
+                            await botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.PermissionError);
+                            return;
+                        }
+                    }
                     var error = VerifyMessage(text, origin.From, out var firstline, out var opts, out var multi);
                     if (error != null) {
                         await botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId);
                         await botClient.SendTextMessageAsync(origin.Chat.Id, error);
                         return;
                     }
-                    if (hash != shash) {
+                    if (hash != shash) { // message edited
                         await Task.WhenAll(
                             botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.HashMisMatchError),
                             botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId),
                             SendRequest(firstline, opts, origin.MessageId, shash, multi));
                         return;
                     }
-                    await SendPoll(origin.From, firstline, opts);
+                    await SendPoll(origin.From, firstline, opts, multi);
                     await Task.WhenAll(
                         botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId),
                         botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.Approved));
                     if (cfg.DeleteOrigin)
                         await botClient.DeleteMessageAsync(cfg.MainChatId, origin.MessageId);
-                } else if (query.Data == _duplicate) {
+                } else if (query.Data == _duplicate) { // Duplicate
+                    // check admin permission
+                    if (!cfg.Admins.Contains(query.From.Id)) {
+                        await botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.PermissionError);
+                        return;
+                    }
+
                     var origin = query.Message.ReplyToMessage;
                     await DuplicatePoll(origin);
                     await Task.WhenAll(
@@ -138,7 +155,14 @@ namespace PollBot {
                         botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.Approved));
                     if (cfg.DeleteOrigin)
                         await botClient.DeleteMessageAsync(cfg.MainChatId, origin.MessageId);
-                } else {
+                } else { // Reject
+                    // check admin / author permission
+                    if (!cfg.Admins.Contains(query.From.Id) && query.From.Id != query.Message.From.Id) {
+                        await botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.PermissionWithAuthorError);
+                        return;
+                    }
+
+                    // Reject
                     await Task.WhenAll(
                         botClient.SendTextMessageAsync(cfg.MainChatId, cfg.translation.RejectError, replyToMessageId: query.Message.ReplyToMessage.MessageId),
                         botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId),
@@ -169,7 +193,7 @@ namespace PollBot {
                     return;
                 }
                 if (direct_send) {
-                    await SendPoll(user, firstline, opts);
+                    await SendPoll(user, firstline, opts, multi);
                 } else {
                     await SendRequest(firstline, opts, msg, text.GetHashCode(), multi);
                 }
