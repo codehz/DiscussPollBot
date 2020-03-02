@@ -49,7 +49,7 @@ namespace PollBot {
                 var text = e.Message.Text;
                 var user = e.Message.From;
                 if (text.StartsWith("/poll") || text.StartsWith("/mpoll")) {
-                    HandleCreate(chat_id: e.Message.Chat.Id, user: user, text: e.Message.Text, msg: e.Message.MessageId);
+                    HandleCreate(chat_id: e.Message.Chat.Id, message: e.Message, text: e.Message.Text, msg: e.Message.MessageId);
                 } else if (text == "/help" || text == $"/help@{botname}") {
                     await botClient.SendTextMessageAsync(e.Message.Chat.Id, cfg.translation.Help, replyToMessageId: e.Message.MessageId);
                 } else if (text == "/stats" || text == $"/stats@{botname}") {
@@ -122,7 +122,7 @@ namespace PollBot {
                             return;
                         }
                     }
-                    var error = VerifyMessage(text, origin.From, out var firstline, out var opts, out var multi);
+                    var error = VerifyMessage(text, origin, out var firstline, out var opts, out var multi);
                     if (error != null) {
                         await botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId);
                         await botClient.SendTextMessageAsync(origin.Chat.Id, error);
@@ -180,20 +180,20 @@ namespace PollBot {
             }
         }
 
-        private static async void HandleCreate(ChatId chat_id, User user, string text, int msg) {
+        private static async void HandleCreate(ChatId chat_id, Message message, string text, int msg) {
             try {
-                var direct_send = cfg.Admins.Contains(user.Id) && cfg.DirectSend;
+                var direct_send = cfg.Admins.Contains(message.From.Id) && cfg.DirectSend;
                 if (chat_id != cfg.MainChatId && !direct_send) {
                     await botClient.SendTextMessageAsync(chat_id, cfg.translation.DisallowError);
                     return;
                 }
-                string error = VerifyMessage(text, user, out var firstline, out var opts, out var multi);
+                string error = VerifyMessage(text, message, out var firstline, out var opts, out var multi);
                 if (error != null) {
                     await botClient.SendTextMessageAsync(chat_id, error);
                     return;
                 }
                 if (direct_send) {
-                    await SendPoll(user, firstline, opts, multi);
+                    await SendPoll(message.From, firstline, opts, multi);
                 } else {
                     await SendRequest(firstline, opts, msg, text.GetHashCode(), multi);
                 }
@@ -225,14 +225,15 @@ namespace PollBot {
         private static async Task DuplicatePoll(Message origin) {
             var poll = origin.Poll;
             var user = origin.From;
-            var msg = await botClient.SendPollAsync(cfg.MainChatId, $"{poll.Question} by {user.FirstName} {user.LastName}",
+            string authorSuffix = BuildAuthorSuffix(origin);
+            var msg = await botClient.SendPollAsync(cfg.MainChatId, $"{poll.Question} {authorSuffix}",
                 options: poll.Options.Select(op => op.Text),
                 allowsMultipleAnswers: poll.AllowsMultipleAnswers,
                 isAnonymous: true);
             db.AddLog(user.Id, user.Username, user.FirstName, user.LastName, poll.Question, msg.MessageId);
         }
 
-        private static string VerifyMessage(string data, User user, out string firstline, out IEnumerable<string> opts, out Boolean multi) {
+        private static string VerifyMessage(string data, Message message, out string firstline, out IEnumerable<string> opts, out Boolean multi) {
             // Default values;
             firstline = null;
             opts = null;
@@ -252,10 +253,7 @@ namespace PollBot {
             var lines = data.Split("\n").ToList();
             string question = null;
             IEnumerable<string> options = null;
-            string authorSuffix = $" by {user.FirstName}";
-            if (user.LastName != null && user.LastName != "") {
-                authorSuffix += " " + user.LastName;
-            }
+            string authorSuffix = " " + BuildAuthorSuffix(message);
             int authorSuffixLength = authorSuffix.UTF16Length();
             int i = 0;
             while (i < lines.Count) {
@@ -294,6 +292,31 @@ namespace PollBot {
             firstline = question;
             opts = options;
             return null;
+        }
+
+        private static string BuildAuthorSuffix(Message message) {
+            if (!string.IsNullOrWhiteSpace(message.ForwardSenderName)) {
+                return message.ForwardSenderName;
+            }
+            string firstName, lastName;
+            if (message.ForwardFromChat != null) {
+                firstName = message.ForwardFromChat.FirstName;
+                lastName = message.ForwardFromChat.LastName;
+            } else {
+                User user;
+                if (message.ForwardFrom != null) {
+                    user = message.ForwardFrom;
+                } else {
+                    user = message.From;
+                }
+                firstName = user.FirstName;
+                lastName = user.LastName;
+            }
+            string authorSuffix = $"by {firstName}";
+            if (string.IsNullOrWhiteSpace(lastName)) {
+                authorSuffix += " " + lastName;
+            }
+            return authorSuffix;
         }
 
         private static async void HandleStat(long chat_id, int msg_id) {
