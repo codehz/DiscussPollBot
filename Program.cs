@@ -136,6 +136,8 @@ namespace PollBot {
                         return;
                     }
                     await SendPoll(origin.From, firstline, opts, multi);
+                    await botClient.SendTextMessageAsync(origin.Chat.Id,
+                        String.Format(cfg.translation.ApprovedBy, BuildName(query.From)));
                     await Task.WhenAll(
                         botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId),
                         botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.Approved));
@@ -164,9 +166,12 @@ namespace PollBot {
 
                     // Reject
                     await Task.WhenAll(
-                        botClient.SendTextMessageAsync(cfg.MainChatId, cfg.translation.RejectError, replyToMessageId: query.Message.ReplyToMessage.MessageId),
+                        botClient.SendTextMessageAsync(cfg.MainChatId, String.Format(
+                            cfg.translation.RejectedBy, BuildName(query.From)
+                            ), replyToMessageId: query.Message.ReplyToMessage.MessageId),
                         botClient.DeleteMessageAsync(cfg.MainChatId, query.Message.MessageId),
-                        botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.Rejected));
+                        botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.Rejected)
+                    );
                 }
             } catch (Exception ex) {
                 Console.WriteLine(ex);
@@ -239,18 +244,20 @@ namespace PollBot {
             opts = null;
             multi = false;
 
+            string trimmed = data;
+
             // Poll types
-            if (data.TryRemovePrefix("/poll ", out data) || data.TryRemovePrefix($"/poll@{botname} ", out data)) {
+            if (data.TryRemovePrefix("/poll ", out trimmed) || data.TryRemovePrefix($"/poll@{botname} ", out trimmed)) {
                 multi = false;
-            } else if (data.TryRemovePrefix("/mpoll ", out data) || data.TryRemovePrefix($"/mpoll@{botname} ", out data)) {
+            } else if (data.TryRemovePrefix("/mpoll ", out trimmed) || data.TryRemovePrefix($"/mpoll@{botname} ", out trimmed)) {
                 multi = true;
             } else {
-                Console.WriteLine($"Unexcepted request: {firstline}");
+                Console.WriteLine($"Unexcepted request: {data}");
                 return cfg.translation.Help;
             }
 
             // data preparation
-            var lines = data.Split("\n").ToList();
+            var lines = trimmed.Split("\n").ToList();
             string question = null;
             IEnumerable<string> options = null;
             string authorSuffix = " " + BuildAuthorSuffix(message);
@@ -294,6 +301,15 @@ namespace PollBot {
             return null;
         }
 
+        private static string BuildName(User user) {
+            string firstName = user.FirstName;
+            string lastName = user.LastName;
+            if (!string.IsNullOrWhiteSpace(lastName)) {
+                return firstName + " " + lastName;
+            }
+            return firstName;
+        }
+
         private static string BuildAuthorSuffix(Message message) {
             if (!string.IsNullOrWhiteSpace(message.ForwardSenderName)) {
                 return message.ForwardSenderName;
@@ -313,7 +329,7 @@ namespace PollBot {
                 lastName = user.LastName;
             }
             string authorSuffix = $"by {firstName}";
-            if (string.IsNullOrWhiteSpace(lastName)) {
+            if (!string.IsNullOrWhiteSpace(lastName)) {
                 authorSuffix += " " + lastName;
             }
             return authorSuffix;

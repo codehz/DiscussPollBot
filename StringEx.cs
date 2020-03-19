@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System;
+using System.Text;
 
 namespace PollBot {
     public static class StringEx {
@@ -7,10 +8,11 @@ namespace PollBot {
                 rest = null;
                 return false;
             }
-            if (self.StartsWith(prefix)) {
+            if (self.ToLower().StartsWith(prefix.ToLower())) {
                 rest = self.Remove(0, prefix.Length);
                 return true;
             }
+            Console.WriteLine($"Prefix is not found: {prefix} in {self}");
             rest = "";
             return false;
         }
