@@ -19,8 +19,14 @@ namespace PollBot {
             [Required, YamlMember(Alias = "approved")]
             public string Approved { get; set; } = "approved";
 
+            [Required, YamlMember(Alias = "approvedby")]
+            public string ApprovedBy { get; set; } = "approvedby";
+
             [Required, YamlMember(Alias = "rejected")]
             public string Rejected { get; set; } = "rejected";
+
+            [Required, YamlMember(Alias = "rejectedby")]
+            public string RejectedBy { get; set; } = "rejectedby";
 
             [Required, YamlMember(Alias = "stats")]
             public string Stats { get; set; } = "stats";
