@@ -11,7 +11,9 @@ texts:
   reject: 退稿
   # reply: 请求已经收到，请管理员审核
   approved: 投票已经创建
+  approvedby: 投票由 {0} 审核通过。
   rejected: 请求已拒绝
+  rejectedby: 投票由 {0} 退稿。
   stats: 投票统计
   help: |-
     使用方式：发送 /poll 或者 /mpoll 创建投票和多选投票，暂时不支持 quiz 模式。
