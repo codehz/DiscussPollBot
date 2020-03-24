@@ -111,7 +111,7 @@ namespace PollBot {
                     // Check permission
                     if (hash != shash) { // edited, update
                         // check admin / author permission
-                        if (!cfg.Admins.Contains(query.From.Id) && query.From.Id != query.Message.From.Id) {
+                        if (!cfg.Admins.Contains(query.From.Id) && query.From.Id != query.Message.ReplyToMessage.From.Id) {
                             await botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.PermissionWithAuthorError);
                             return;
                         }
@@ -159,7 +159,7 @@ namespace PollBot {
                         await botClient.DeleteMessageAsync(cfg.MainChatId, origin.MessageId);
                 } else { // Reject
                     // check admin / author permission
-                    if (!cfg.Admins.Contains(query.From.Id) && query.From.Id != query.Message.From.Id) {
+                    if (!cfg.Admins.Contains(query.From.Id) && query.From.Id != query.Message.ReplyToMessage.From.Id) {
                         await botClient.AnswerCallbackQueryAsync(query.Id, cfg.translation.PermissionWithAuthorError);
                         return;
                     }
