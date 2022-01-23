@@ -14,7 +14,7 @@
   <ItemGroup>
     <PackageReference Include="ObjectDumper.NET" Version="2.5.20033.1" />
     <PackageReference Include="System.Data.SQLite" Version="1.0.112" />
-    <PackageReference Include="Telegram.Bot" Version="15.3.0" />
+    <PackageReference Include="Telegram.Bot" Version="17.0.0" />
     <PackageReference Include="YamlDotNet" Version="8.1.0" />
   </ItemGroup>
 
